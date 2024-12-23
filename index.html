@@ -25,8 +25,8 @@
         const errorMessageParagraph = document.getElementById('error-message');
 
         // Replace with your Groq API Key
-        const GROQ_API_KEY = "your-groq-api-key";
-        const GROQ_URL = "https://api.groq.com/v1/transcriptions";
+        const GROQ_API_KEY = "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";  // Replace with your actual API key
+        const GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions";  // Confirm this URL in the Groq API documentation
 
         // Start recording
         startButton.addEventListener('click', async () => {
@@ -63,7 +63,7 @@
                         });
 
                         if (!response.ok) {
-                            throw new Error(`Failed to send audio to API. Status: ${response.status}`);
+                            throw new Error(`Failed to send audio to API. Status: ${response.status} - ${response.statusText}`);
                         }
 
                         const data = await response.json();
