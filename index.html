@@ -3,85 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Speech-to-Text App</title>  <!-- Modified Title Here -->
+    <title>Audio Recorder with Transcription</title>
 </head>
 <body>
-    <h1>Speech to Text with Groq API</h1>
+    <h1>Audio Recorder with Transcription</h1>
     <button id="start">Start Recording</button>
     <button id="stop" disabled>Stop Recording</button>
-    <p id="transcription">Transcription will appear here...</p>
+    <audio id="player" controls></audio>
+    <h2>Transcription:</h2>
+    <p id="transcription">Your transcription will appear here...</p>
+    <p id="error-message" style="color: red;"></p> <!-- Error message container -->
 
     <script>
-        const startButton = document.getElementById('start');
-        const stopButton = document.getElementById('stop');
-        const transcriptionParagraph = document.getElementById('transcription');
-
         let mediaRecorder;
         let audioChunks = [];
-        let audioBlob;
 
-        // Replace with your Groq API URL and API key
-        const API_URL = 'https://api.groq.com/v1/speech-to-text';  // Example endpoint
-        const API_KEY = 'your-groq-api-key';  // Replace with your Groq API key
+        const startButton = document.getElementById('start');
+        const stopButton = document.getElementById('stop');
+        const audioPlayer = document.getElementById('player');
+        const transcriptionParagraph = document.getElementById('transcription');
+        const errorMessageParagraph = document.getElementById('error-message');
 
-        // Function to start recording
+        // Replace with your Groq API Key
+        const GROQ_API_KEY = "your-groq-api-key";
+        const GROQ_URL = "https://api.groq.com/v1/transcriptions";
+
+        // Start recording
         startButton.addEventListener('click', async () => {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-
-            mediaRecorder.ondataavailable = (event) => {
-                audioChunks.push(event.data);
-            };
-
-            mediaRecorder.onstop = async () => {
-                audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-
-                // Display audio as a player
-                const audioURL = URL.createObjectURL(audioBlob);
-                const audioPlayer = new Audio(audioURL);
-                audioPlayer.controls = true;
-                document.body.appendChild(audioPlayer);
-
-                // Send audio to Groq API for transcription
-                const formData = new FormData();
-                formData.append('audio', audioBlob, 'audio.wav');
-
-                try {
-                    // Send audio data to Groq API via POST request
-                    const response = await fetch(API_URL, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${API_KEY}`,
-                        },
-                        body: formData,
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        console.log(data);  // Log the response to inspect it
-                        const transcription = data.transcription || 'No transcription available.';
-                        transcriptionParagraph.innerText = transcription;
-                    } else {
-                        const errorData = await response.json();
-                        transcriptionParagraph.innerText = 'Failed to transcribe audio.';
-                        console.error('API Error:', errorData);
-                    }
-                } catch (error) {
-                    transcriptionParagraph.innerText = 'Error sending audio to Groq API.';
-                    console.error('Network Error:', error);
+            try {
+                // Request microphone access
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                if (!stream) {
+                    throw new Error("Unable to access the microphone.");
                 }
-            };
 
-            mediaRecorder.start();
-            startButton.disabled = true;
-            stopButton.disabled = false;
+                mediaRecorder = new MediaRecorder(stream);
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    try {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                        audioPlayer.src = URL.createObjectURL(audioBlob);
+
+                        // Send the audio file to the Groq API for transcription
+                        const formData = new FormData();
+                        formData.append('file', audioBlob, 'audio.wav');
+                        formData.append('model', 'whisper-large-v3'); // Choose your transcription model here
+
+                        // Send audio to Groq API
+                        const response = await fetch(GROQ_URL, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${GROQ_API_KEY}`,
+                            },
+                            body: formData,
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`Failed to send audio to API. Status: ${response.status}`);
+                        }
+
+                        const data = await response.json();
+                        if (data && data.transcription) {
+                            transcriptionParagraph.innerText = data.transcription;
+                            console.log("Transcription received:", data.transcription);
+                        } else {
+                            throw new Error("No transcription found in the response.");
+                        }
+                    } catch (apiError) {
+                        errorMessageParagraph.innerText = `Error processing transcription: ${apiError.message}`;
+                        console.error("API Error:", apiError);
+                    }
+                };
+
+                mediaRecorder.start();
+                startButton.disabled = true;
+                stopButton.disabled = false;
+                errorMessageParagraph.innerText = ""; // Clear any previous errors
+            } catch (err) {
+                errorMessageParagraph.innerText = `Error starting recording: ${err.message}`;
+                console.error("Error starting recording:", err);
+            }
         });
 
-        // Function to stop recording
+        // Stop recording
         stopButton.addEventListener('click', () => {
-            mediaRecorder.stop();
-            startButton.disabled = false;
-            stopButton.disabled = true;
+            try {
+                mediaRecorder.stop();
+                startButton.disabled = false;
+                stopButton.disabled = true;
+                errorMessageParagraph.innerText = ""; // Clear any previous errors
+            } catch (err) {
+                errorMessageParagraph.innerText = `Error stopping recording: ${err.message}`;
+                console.error("Error stopping recording:", err);
+            }
         });
     </script>
 </body>
